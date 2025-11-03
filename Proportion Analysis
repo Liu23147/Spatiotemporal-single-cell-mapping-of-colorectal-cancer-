@@ -1,0 +1,67 @@
+#######pca,distance#######
+table(scRNA1$tissue)
+tmp<-table(scRNA1$sample,scRNA1$celltype)
+tmp<-tmp/apply(tmp,1,sum)
+mat<-prcomp(tmp)
+pcVar<-summary(mat)
+varPC1<-pcVar$importance[2,1]
+varPC2<-pcVar$importance[2,2]
+mat<-mat$x[,1:2]
+mat<-as.data.frame(mat)
+Cellratio <- prop.table(table(scRNA1$tissue, scRNA1$sample), margin = 2)
+Cellratio <- as.data.frame(Cellratio)
+Cellratio <- filter(Cellratio, Freq != 0)
+mat$Class<-Cellratio$Var1
+ggplot(data=mat,aes(x=PC1,y=PC2,color=Class))+geom_point()+theme_classic()+
+  xlab(paste("PC1 explained variance=",varPC1*100,"%",sep=""))+ylab(paste("PC2 explained variance=",varPC2*100,"%",sep=""))
+#distance
+test<-split(mat[,1:2],mat$Class)
+test<-lapply(test,function(w){apply(w,2,mean)})
+test<-do.call(rbind,test)
+
+d<-dist(test)
+
+d<-as.matrix(d)
+
+library(corrplot)
+corrplot(d,type="lower",is.corr = FALSE,addCoef.col="black",number.font = 0.05,method = "color",number.digits = 5)
+#######distance#######
+Cellratio <- prop.table(table(Idents(scRNA1), scRNA1$tissue), margin = 2)#计算各组样本不同细胞群比例
+Cellratio
+
+Cellratio <- as.data.frame(Cellratio)
+
+library(ggplot2)
+ggplot(Cellratio) + 
+  geom_bar(aes(x =Var2, y= Freq, fill = Var1),stat = "identity",width = 0.7,size = 0.5,colour = '#222222')+ 
+  theme_classic() +
+  labs(x='Sample',y = 'Ratio')+
+  theme(panel.border = element_rect(fill=NA,color="black", size=0.5, linetype="solid"))+ scale_color_manual(
+    values = zzm8colors
+  )+ scale_fill_manual(
+    values = zzm8colors 
+  )
+
+Cellratio <- prop.table(table(scRNA1$tissue, scRNA1$sample), margin = 2)
+Cellratio1 <- prop.table(table(Idents(scRNA1), scRNA1$sample), margin = 2)
+
+Cellratio <- as.data.frame(Cellratio)
+Cellratio1 <- as.data.frame(Cellratio1)
+
+merged_data <- left_join(Cellratio1, Cellratio, by = c("Var2" = "Var2"))
+merged_data  <- filter(merged_data, Freq.y != 0)
+
+merged_data$Freq <- as.numeric(merged_data$Freq)
+
+ggplot(merged_data, aes(x = Var1.x, y = Freq.x, color =  Var1.y)) +
+  geom_boxplot(aes(color = Var1.y), alpha = 0.3, outlier.shape  = NA, width = 0.6) + 
+  geom_jitter(position = position_jitterdodge(jitter.width  = 0.1, dodge.width  = 0.6), 
+              size = 1.5, alpha = 0.6) + 
+  theme_minimal(base_size = 15) + 
+  theme(panel.grid  = element_blank(), 
+        axis.line  = element_line(color = "black"), 
+        axis.ticks  = element_line(color = "black")) + 
+  labs(x = "Cell Type", y = "Cell Proportion", color = "Sample") + 
+  ggtitle("Cell Proportion") + 
+  stat_compare_means(aes(label = ..p.signif..),  label.x = 1.5) + 
+  scale_color_manual(values = c("HI" = "#4991C1", "ANT" = "#79B99D", "Tumor" = "#C6307C"))
