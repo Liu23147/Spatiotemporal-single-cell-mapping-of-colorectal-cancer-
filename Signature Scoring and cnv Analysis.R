@@ -19,11 +19,11 @@ zzm8colors<-c('#C6307C',
               '#435B95',
               '#79B99D')
 meta_data$celltype <- factor(meta_data$celltype)
-lot(meta_data, aes(x = celltype, y = HYPOXIA_score1)) +  
+lot(meta_data, aes(x = celltype, y = Signature Scoring1)) +  
   geom_boxplot(aes(fill = celltype), outlier.shape = NA) +  
-  labs(title = "HYPOXIA_score",
+  labs(title = "Signature Scoring",
        x = "celltype",
-       y = "HYPOXIA_score") +
+       y = "Signature Scoring") +
   theme_bw() + 
   theme(
     plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
