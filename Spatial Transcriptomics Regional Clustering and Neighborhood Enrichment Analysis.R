@@ -1,66 +1,57 @@
+library(GeneNMF)
+library(Seurat)
+library(ggplot2)
+library(UCell)
+library(patchwork)
+library(Matrix)
+library(RcppML)
+library(viridis)
 NAT <- Load10X_Spatial(data.dir = localdir)
 NAT <- NormalizeData(NAT)
 NAT <- FindVariableFeatures(NAT)
 NAT <- ScaleData(NAT)
-
-
-SpatialFeaturePlot(NAT, features = c('CXCL10','CXCR3'),image.alpha=0 ,
+SpatialFeaturePlot(NAT, features = c('CXCL12','CXCR4'),image.alpha=0 ,
                    pt.size.factor = 20)
-SpatialFeaturePlot(P1, features = c('ANXA1'),image.alpha=0)
-SpatialFeaturePlot(P1, features = c("RGS13"))
-
 SpatialDimPlot(NAT, label = T, repel = T, label.size = 4)
-
-NAT<-pre
-
+###RCTD##
 NAT <- SketchData(
   object = NAT,
   ncells = 50000,
   method = "LeverageScore",
   sketched.assay = "sketch"
 )
-
 DefaultAssay(NAT) <- "sketch"
 NAT <- ScaleData(NAT)
 NAT <- RunPCA(NAT, assay = "sketch", reduction.name = "pca.NAT.sketch", verbose = T)
 NAT <- FindNeighbors(NAT, reduction = "pca.NAT.sketch", dims = 1:50)
 NAT <- RunUMAP(NAT, reduction = "pca.NAT.sketch", reduction.name = "umap.NAT.sketch", return.model = T, dims = 1:50, verbose = T)
-
 ref=readRDS(ref.RDS)
 Idents(ref) <- "group"
 ref<-subset(ref, idents=c('Pre'))
-
 Idents(ref) <- "celltype"
 counts <- ref[["SCT"]]$counts
 cluster <- as.factor(ref$celltype)
 nUMI <- as.integer(ref$nCount_RNA)
 names(nUMI) <- colnames(counts)  # Add cell barcodes as names
-
 levels(cluster) <- gsub("/", "-", levels(cluster))
 cluster <- droplevels(cluster)
 
-# Ensure cluster also has cell barcode names (if not already)
 names(cluster) <- colnames(counts)  # Only if cluster is a vector without names
-
 reference <- Reference(counts, cluster, nUMI) 
 
 counts_hd <- NAT[["sketch"]]$counts
 NAT_cells_hd <- colnames(NAT[["sketch"]])
 coords <- GetTissueCoordinates(NAT)[NAT_cells_hd, 1:2]
 
-# create the RCTD query object
 query <- SpatialRNA(coords, counts_hd, colSums(counts_hd))
 
 RCTD <- create.RCTD(query, reference, max_cores = 1,
                     CELL_MIN_INSTANCE = 0)
 
 RCTD <- run.RCTD(RCTD, doublet_mode = "doublet")
-# add results back to Seurat object
 NAT <- AddMetaData(NAT, metadata = RCTD@results$results_df)
-
 NAT$first_type <- as.character(NAT$first_type)
 NAT$first_type[is.na(NAT$first_type)] <- "Unknown"
-
 NAT <- ProjectData(
   object = NAT,
   assay = "Spatial",
@@ -71,14 +62,10 @@ NAT <- ProjectData(
   dims = 1:50,
   refdata = list(full_first_type= "first_type")
 )
-
 DefaultAssay(NAT) <- "Spatial"
-
-# we only ran RCTD on the cortical cells
-# set labels to all other cells as "Unknown"
 NAT[[]][, "full_first_type"] <- "Unknown"
 NAT$full_first_type[Cells(NAT)] <- NAT$first_type[Cells(NAT)]
-
+###NeighborhoodEnrichment##
 library(semla)
 library(DT)
 SANT <- UpdateSeuratForSemla(ANT)
@@ -124,23 +111,23 @@ ggplot(hm_plot_data, aes(label_1, label_2, fill= z_score)) +
         axis.text = element_text(size=10),
         legend.title = element_text(size=10), 
         legend.text = element_text(size=10))
-
-pre <- RunBanksy(pre,
+###Banksy##
+P1 <- RunBanksy(P1,
                  lambda = 0.8, verbose = TRUE,
                  assay = "Spatial", slot = "data", features = "variable",
                  k_geom = 50
 )
-DefaultAssay(pre) <- "BANKSY"
-pre <- RunPCA(pre, assay = "BANKSY", reduction.name = "pca.banksy", features = rownames(pre), npcs = 30)
-pre <- FindNeighbors(pre, reduction = "pca.banksy", dims = 1:30)
-pre <- FindClusters(pre, cluster.name = "banksy_cluster", resolution = 0.5)
-Idents(pre) <- "banksy_cluster"
-SpatialDimPlot(pre, group.by = "banksy_cluster", label = T, repel = T, label.size = 4)
+DefaultAssay(P1) <- "BANKSY"
+P1 <- RunPCA(P1, assay = "BANKSY", reduction.name = "pca.banksy", features = rownames(pre), npcs = 30)
+P1 <- FindNeighbors(P1, reduction = "pca.banksy", dims = 1:30)
+P1 <- FindClusters(P1, cluster.name = "banksy_cluster", resolution = 0.5)
+Idents(P1) <- "banksy_cluster"
+SpatialDimPlot(P1, group.by = "banksy_cluster", label = T, repel = T, label.size = 4)
 
-cells <- CellsByIdentities(pre, idents = c(18))
+cells <- CellsByIdentities(P1, idents = c(18))
 
 SpatialDimPlot(
-  pre,
+  P1,
   pt.size.factor = 5,
   cells.highlight = cells,  
   cols.highlight = c('#4991C1',
@@ -148,11 +135,9 @@ SpatialDimPlot(
   facet.highlight = FALSE,  
   combine = TRUE)
 
-
-SpatialDimPlot(pre, group.by = "banksy_cluster", label = F, repel = T, label.size = 4)+ SpatialDimPlot(P1, group.by = "banksy_cluster", label = F, repel = T, label.size = 4)
+SpatialDimPlot(P1, group.by = "banksy_cluster", label = F, repel = T, label.size = 4)+ SpatialDimPlot(P1, group.by = "banksy_cluster", label = F, repel = T, label.size = 4)
 
 cells <- CellsByIdentities(P1, idents = c(18))
-
 SpatialDimPlot(
   P1,
   pt.size.factor = 5,
