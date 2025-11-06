@@ -51,3 +51,151 @@ infercnv_obj = infercnv::run(infercnv_obj,
                              cluster_by_groups=TRUE, 
                              denoise=TRUE,
                              HMM=TRUE)
+#####V## GO KEGG###
+suppressMessages({
+  library(Seurat)
+  #library(corrplot)
+  library(tidyverse)
+  library(RColorBrewer)
+  library(clusterProfiler)
+  library(org.Hs.eg.db)
+  #library(org.Mm.eg.db)
+})
+
+Idents(scRNA1)<-"celltype"
+scRNA2<-subset(scRNA1, idents=c('FPR_Mo'))
+cluster1.markers <- FindMarkers(scRNA2, ident.1 = 'Tumor',ident.2 = 'HI', verbose = TRUE, logfc.threshold=0.05)
+sig_dge.celltype <- subset(cluster1.markers, p_val_adj<0.05&avg_log2FC>0.5)
+ego_ALL <- enrichGO(gene          = row.names(sig_dge.celltype),
+                    #universe     = row.names(dge.celltype),
+                    OrgDb         = 'org.Hs.eg.db',
+                    keyType       = 'SYMBOL',
+                    ont           = "ALL",
+                    pAdjustMethod = "BH",
+                    pvalueCutoff  = 0.01,
+                    qvalueCutoff  = 0.05)
+ego_all <- data.frame(ego_ALL)   
+ego_CC <- enrichGO(gene          = row.names(sig_dge.celltype),
+                   #universe     = row.names(dge.celltype),
+                   OrgDb         = 'org.Hs.eg.db',
+                   keyType       = 'SYMBOL',
+                   ont           = "CC",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff  = 0.01,
+                   qvalueCutoff  = 0.05)
+ego_MF <- enrichGO(gene          = row.names(sig_dge.celltype),
+                   #universe     = row.names(dge.celltype),
+                   OrgDb         = 'org.Hs.eg.db',
+                   keyType       = 'SYMBOL',
+                   ont           = "MF",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff  = 0.01,
+                   qvalueCutoff  = 0.05)
+ego_BP <- enrichGO(gene          = row.names(sig_dge.celltype),
+                   #universe     = row.names(dge.celltype),
+                   OrgDb         = 'org.Hs.eg.db',
+                   keyType       = 'SYMBOL',
+                   ont           = "BP",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff  = 0.01,
+                   qvalueCutoff  = 0.05)           
+ego_CC@result$Description <- substring(ego_CC@result$Description,1,70)
+ego_MF@result$Description <- substring(ego_MF@result$Description,1,70)
+ego_BP@result$Description <- substring(ego_BP@result$Description,1,70)
+p_BP <- barplot(ego_BP,showCategory = c('neutrophil chemotaxis','positive regulation of inflammatory response','antigen processing and presentation of exogenous antigen','neutrophil migration','leukocyte migration','myeloid leukocyte migration','granulocyte migration')) + ggtitle("barplot for Biological process")
+library(ggplot2)
+selected_terms <- c('viral process', 'viral life cycle', 
+                    'antigen processing and presentation of exogenous antigen', 
+                    'regulation of viral process', 'antigen processing and presentation'
+                    )
+plot_data <- ego_BP@result %>% 
+  filter(Description %in% selected_terms) %>% 
+  arrange(desc(Count)) %>% 
+  mutate(Description = factor(Description, levels = Description))
+ggplot(plot_data, aes(x = Count, y = reorder(Description, Count))) +
+  geom_segment(aes(x = 0, xend = Count, yend = Description),
+               color = "#B383B9", linewidth = 1.2) +
+  geom_point(size = 10, color = "#B383B9") +
+  geom_text(aes(label = Count), 
+            nudge_x = 0, 
+            color = "white",  
+            size = 4.5, 
+            fontface = "bold") +  
+  labs(title = "Biological Process Lollipop Plot",
+       x = "Gene Count", y = "") +
+  theme_minimal() +
+  theme(
+    axis.line  = element_line(color = "black", linewidth = 0.6), 
+    axis.ticks  = element_line(color = "black"), 
+    panel.grid  = element_blank(),
+    axis.text.y  = element_text(size = 12, face = "bold", colour = "black"),
+    axis.text.x  = element_text(size = 11, face = "plain"),
+    axis.title.x  = element_text(size = 13, margin = margin(t=10)),
+    plot.title  = element_text(size = 16, hjust = 0.5, face = "bold.italic") 
+  )
+
+#######PROGENy#######
+library(progeny)
+library(tidyr)
+library(tibble)
+Idents(scRNA2) <- 'celltype'
+CellsClusters <- data.frame(Cell = names(Idents(scRNA2)), 
+                            cellType = as.character(Idents(scRNA2)),
+                            stringsAsFactors = FALSE)
+scRNA2<- progeny(scRNA2, scale=FALSE, organism="Human", top=500, perm=1, assay_name = "SCT",
+                 return_assay = TRUE)
+scRNA2@assays$progeny
+scRNA2<- Seurat::ScaleData(scRNA2, assay = "progeny") 
+progeny_scores_df <- 
+  as.data.frame(t(GetAssayData(scRNA2, slot = "scale.data", 
+                               assay = "progeny"))) %>%
+  rownames_to_column("Cell") %>%
+  gather(Pathway, Activity, -Cell) 
+dim(progeny_scores_df)
+progeny_scores_df <- inner_join(progeny_scores_df, CellsClusters)
+summarized_progeny_scores <- progeny_scores_df %>% 
+  group_by(Pathway, cellType) %>%
+  summarise(avg = mean(Activity), std = sd(Activity))
+dim(summarized_progeny_scores)
+summarized_progeny_scores_df <- summarized_progeny_scores %>%
+  dplyr::select(-std) %>%   
+  spread(Pathway, avg) %>%
+  data.frame(row.names = 1, check.names = FALSE, stringsAsFactors = FALSE) 
+paletteLength = 100
+myColor = colorRampPalette(c("#4991C1", "white","#FF0000"))(paletteLength)
+zzm8colors<-c('#C6307C',
+              '#4991C1',
+              '#D0AFC4',
+              '#89558D',
+              '#AFC2D9',
+              '#435B95',
+              '#79B99D','#E9E55A','#88558D','#C6367A',
+              '#B3B5B1','#8BAACD',
+              '#8E9296')
+
+progenyBreaks = c(seq(min(summarized_progeny_scores_df), 0, 
+                      length.out=ceiling(paletteLength/2) + 1),
+                  seq(max(summarized_progeny_scores_df)/paletteLength, 
+                      max(summarized_progeny_scores_df), 
+                      length.out=floor(paletteLength/2)))
+
+progeny_hmap = pheatmap(t(summarized_progeny_scores_df),fontsize=12, scale="column",cluster_rows=T,cluster_cols=F,
+                        fontsize_row = 10, 
+                        color=myColor)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
