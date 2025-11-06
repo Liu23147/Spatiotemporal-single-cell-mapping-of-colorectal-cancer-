@@ -36,3 +36,55 @@ ggplot(merged_data, aes(x = Var1.x, y = Freq.x, color =  Var1.y)) +
   ggtitle("Cell Proportion") + 
   stat_compare_means(aes(label = ..p.signif..),  label.x = 1.5) + 
   scale_color_manual(values = c("HI" = "#4991C1", "ANT" = "#79B99D", "Tumor" = "#C6307C"))
+
+library(ggplot2)
+library(ggcorrplot)
+library(reshape2)
+Cellratio <- prop.table(table( scRNA1$sample,Idents(scRNA1)), margin = 2)
+Cellratio <- as.data.frame(Cellratio)
+matrix_data <- reshape2::dcast(Cellratio , Var1 ~ Var2, value.var = "Freq", fill = 0)
+rownames(matrix_data) <- matrix_data$Var2
+matrix_data <- matrix_data[, -1]
+
+cor_res <- Hmisc::rcorr(as.matrix(matrix_data))
+
+correlation_matrix <- cor_res$r
+p_value_matrix <- cor_res$P
+
+cor_long <- melt(correlation_matrix)
+p_long <- melt(p_value_matrix)
+colnames(cor_long) <- c("Var1", "Var2", "Correlation")
+colnames(p_long) <- c("Var1", "Var2", "P_value")
+cor_p_data <- merge(cor_long, p_long, by = c("Var1", "Var2"))
+cor_p_data$Significance <- ifelse(cor_p_data$P_value < 0.001, "***",
+                                  ifelse(cor_p_data$P_value < 0.01, "**",
+                                         ifelse(cor_p_data$P_value < 0.05, "*", "")))
+ggplot(cor_p_data, aes(Var1, Var2, fill = Correlation)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+                       midpoint = 0, limit = c(-1, 1), space = "Lab",
+                       name = "Correlation") +
+  geom_text(aes(label = Significance), color = "black", size = 4) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, face = "bold", size = 14), 
+        axis.text.y = element_text(face = "bold", size = 14), 
+        axis.title = element_text(face = "bold", size = 16)) + 
+  labs(x = "Cell Types", y = "Cell Types", title = "Correlation Heatmap with Significance") +
+  scale_fill_gradient2(low = "#1f77b4", high = "#d62728", mid = "#ffffff", 
+                       midpoint = 0, limit = c(-1, 1), space = "Lab",
+                       name = "Correlation")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
