@@ -1,21 +1,31 @@
 scVirtualKO: In Silico Knockout Analysis for Single-Cell RNA-seq
+
 scVirtualKO is an R-based tool designed to perform in silico perturbation analysis on single-cell RNA-sequencing (scRNA-seq) data. By leveraging Random Forest regression at the single-cell level, it models the dependency between a target gene (KO gene) and downstream targets, allowing you to predict the shift in gene expression upon virtual knockout.
 
 Key Idea: Train on the population, predict on single cells, and validate with multi-modal prior knowledge (PPI, TF motifs, Ligand-Receptor networks).
+
 Cell-Level Modeling: Builds independent Random Forest models for each target gene using the KO gene and background context genes as predictors.
+
 Virtual Perturbation: Simulates the effect of gene knockout (KO_Gene = 0) while maintaining the cellular context (background genes).
+
 Multi-Modal Validation: automatically integrates prior knowledge to tag results:
+
 TF: Transcription Factor motifs (via DoRothEA).
+
 PPI: Protein-Protein Interactions (via OmniPath).
+
 Ligand/Receptor: Downstream signaling targets (via NicheNet).
+
 Smart Filtering: Automatically excludes mitochondrial (MT-) and ribosomal (RPS/RPL) genes to reduce noise.
+
 Flexible Background Control: Supports automatic High-Variable Genes (HVGs) selection, manual background gene lists, or pure univariate modeling (no background).
-Ensure you have the following R packages installed:
+
+#Ensure you have the following R packages installed:
 install.packages(c("Seurat", "ranger", "dplyr", "tibble", "Matrix", "ggplot2", "ggrepel"))
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install(c("OmnipathR", "dorothea", "nichenetr"))
 library(Seurat)
-source("scVirtualKO.R") # Load the function script
+source("scVirtualKO_function.R") # Load the function script
 
 # 1. Load your Seurat object
 seurat_obj <- readRDS("your_data.rds")
