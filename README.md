@@ -57,7 +57,7 @@ head(results)
 
 
 
-#Parameters
+# Parameters
 seurat_obj	A Seurat object containing single-cell expression data.	Required
 
 ko_gene	The gene symbol to virtually knockout.	Required
