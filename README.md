@@ -22,9 +22,13 @@ Flexible Background Control: Supports automatic High-Variable Genes (HVGs) selec
 
 #Ensure you have the following R packages installed:
 install.packages(c("Seurat", "ranger", "dplyr", "tibble", "Matrix", "ggplot2", "ggrepel"))
+
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+
 BiocManager::install(c("OmnipathR", "dorothea", "nichenetr"))
+
 library(Seurat)
+
 source("scVirtualKO_function.R") # Load the function script
 
 # 1. Load your Seurat object
