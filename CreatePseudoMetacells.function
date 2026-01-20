@@ -1,0 +1,60 @@
+#' Create Pseudo Metacells (Based on PCA K-means clustering)
+#' 
+#' @param seurat_obj Original Seurat object (Must have run RunPCA)
+#' @param cells_per_metacell Expected number of original cells per Metacell (Default 20)
+#' @return A new Seurat object with fewer cells (Metacell Object)
+CreatePseudoMetacells <- function(seurat_obj, cells_per_metacell = 10) {
+  
+  message("Constructing Metacells...")
+  
+  # 1. Check PCA
+  if (!"pca" %in% names(seurat_obj@reductions)) {
+    stop("Error: Input object has not run PCA! Please run RunPCA(seurat_obj) first.")
+  }
+  
+  # 2. Determine number of Metacells
+  n_cells <- ncol(seurat_obj)
+  k_centers <- floor(n_cells / cells_per_metacell)
+  
+  if (k_centers < 10) {
+    stop("Too few cells to construct effective Metacells. It is recommended to use original data directly.")
+  }
+  
+  message(paste0("Original cell count: ", n_cells, 
+                 " -> Expected Metacell count: ", k_centers, 
+                 " (Aggregation granularity: ~", cells_per_metacell, " cells/spot)"))
+  
+  # 3. Run K-means clustering in PCA space
+  # This is much faster than building a KNN graph and is precise enough for clusters composed of similar cells
+  pca_embeddings <- Embeddings(seurat_obj, reduction = "pca")
+  # For speed, only take the top 20 PCs
+  pca_embeddings <- pca_embeddings[, 1:min(20, ncol(pca_embeddings))]
+  
+  set.seed(123) # Ensure reproducibility
+  km_res <- kmeans(pca_embeddings, centers = k_centers, iter.max = 20)
+  
+  # Add clustering results as metadata
+  seurat_obj$metacell_group <- as.factor(km_res$cluster)
+  
+  # 4. Aggregate expression (Aggregation)
+  # Use Seurat's built-in efficient aggregation function
+  # Note: Here we aggregate "counts" (raw reads), which is mathematically most rigorous
+  agg_data <- AverageExpression(seurat_obj, 
+                                group.by = "metacell_group", 
+                                assays = "RNA", 
+                                slot = "counts")$RNA
+  
+  # AverageExpression returns averages; we need to treat this as a new "cell"
+  # Although it's an average (not integer), it can be used directly for subsequent processing
+  
+  # 5. Create new Seurat object
+  seurat_mc <- CreateSeuratObject(counts = agg_data)
+  
+  # 6. Normalize the new object (Standard workflow)
+  seurat_mc <- NormalizeData(seurat_mc, verbose = FALSE)
+  seurat_mc <- FindVariableFeatures(seurat_mc, nfeatures = 2000, verbose = FALSE)
+  seurat_mc <- ScaleData(seurat_mc, verbose = FALSE)
+  
+  message("Metacell object construction complete!")
+  return(seurat_mc)
+}
