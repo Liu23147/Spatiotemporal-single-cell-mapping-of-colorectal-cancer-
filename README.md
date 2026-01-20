@@ -24,7 +24,9 @@ niche_net=readRDS(url("https://zenodo.org/record/7074291/files/lr_network_human_
 niche_mat=readRDS(url("https://zenodo.org/records/7074291/files/ligand_target_matrix_nsga2r_final.rds"))
 # 2. Run Virtual KO
 To accurately model the effect of a KO gene, it is crucial to provide a stable "background context." This helps the model distinguish between specific gene regulation and general cell states (e.g., cell cycle phase, metabolic activity).
+
 my_background=c(GAPDH","ACTB","MKI67","TOP2A","PCNA","CDK1","CCNB1")
+
 results <- scVirtualKO_Loop (scRNA_metacell , ko_gene = "FPR1", mode = c('Receptor'),manual_background_genes = my_background  ,
                             n_targets = 1000, 
                             n_trees = 2000,
@@ -43,10 +45,17 @@ head(results)
 
 #Parameters
 seurat_obj	A Seurat object containing single-cell expression data.	Required
+
 ko_gene	The gene symbol to virtually knockout.	Required
+
 manual_background_genes	Control background context:- NULL: Auto-select top 50 HVGs.- FALSE: Disable background.- Vector: Use specific genes (Recommended).	NULL
+
 confounders	A vector of metadata columns (e.g., "seurat_clusters", "pseudotime") to include as covariates. Essential for fixing cell identity during prediction.	NULL
+
 mode	Validation strategies. Options: "TF", "PPI", "Ligand", "Receptor".	All
+
 n_targets	Number of additional high-variance genes to predict.	100
+
 candidate_genes	A vector of specific target genes you want to predict (optional).	NULL
+
 ppi_source	Custom dataframe for PPI validation (columns: source_genesymbol, target_genesymbol).	NULL
