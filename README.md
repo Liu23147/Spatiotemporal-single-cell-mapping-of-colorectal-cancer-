@@ -18,7 +18,7 @@ library(Seurat)
 source("scVirtualKO.R") # Load the function script
 
 # 1. Load your Seurat object
-# seurat_obj <- readRDS("your_data.rds")
+seurat_obj <- readRDS("your_data.rds")
 ppi_source=read.csv("ppi_source.csv")
 niche_net=readRDS(url("https://zenodo.org/record/7074291/files/lr_network_human_21122021.rds"))
 niche_mat=readRDS(url("https://zenodo.org/records/7074291/files/ligand_target_matrix_nsga2r_final.rds"))
