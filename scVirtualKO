@@ -1,4 +1,5 @@
-
+####If the number of cells in single-cell sequencing is too large, or if you want to save time, you can use our CreatePseudoMetacells.
+scRNA_metacell <- CreatePseudoMetacells(scRNA1, cells_per_metacell = 50)
 res9 <- scVirtualKO(scRNA1 , ko_gene = "FPR1", mode = c('Receptor'),manual_background_genes = my_background  ,
                             n_targets = 1000, 
                             n_trees = 2000,
@@ -94,3 +95,29 @@ geom_text_repel(
     panel.grid.minor = element_blank()
   )
 print(p)
+
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(enrichplot)
+library(ggplot2)
+library(dplyr)
+
+neg_genes_df <- res %>%
+  filter(Delta_Mean < 0 & P_Adj < 0.05) 
+
+target_symbols=neg_genes_df$Gene
+
+
+ego <- enrichGO(gene          = target_symbols ,
+                OrgDb         = org.Hs.eg.db,
+                ont           = "BP",       
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 0.2,
+                keyType       = 'SYMBOL')        
+write.csv(ego,'ego.csv')
+
+p1 <- dotplot(ego, showCategory = c('positive regulation of leukocyte activation','leukocyte cell-cell adhesion','myeloid leukocyte differentiation','response to interferon-gamma','humoral immune response','positive regulation of leukocyte migration','myeloid leukocyte migration','lymphocyte chemotaxis')) + 
+    ggtitle("GO Enrichment (Negative Delta / Upregulated in KO)") +
+    scale_color_gradient(low = "red", high = "blue")
+  print(p1)
