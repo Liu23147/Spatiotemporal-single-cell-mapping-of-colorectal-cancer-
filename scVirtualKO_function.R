@@ -1,11 +1,6 @@
-library(Seurat)
-library(ranger)
-library(dplyr)
-library(tibble)
-library(Matrix)
 
 # ==============================================================================
-# 1. Main Function: scVirtualKO
+# 1. Main Function: scVirtualKO_Loop
 # ==============================================================================
 
 #' @title In Silico Knockout Analysis (Looping/Univariate Approach)
@@ -26,7 +21,7 @@ library(Matrix)
 #' @param n_trees Number of trees for Random Forest.
 #' @param seed Random seed.
 #' @param verbose Print progress messages.
-scVirtualKO <- function(seurat_obj, 
+scVirtualKO_Loop <- function(seurat_obj, 
                              ko_gene, 
                              candidate_genes = NULL,
                              manual_background_genes = NULL, 
@@ -68,7 +63,7 @@ scVirtualKO <- function(seurat_obj,
   
   # --- Step 2: Sequential Validation ---
   rf_results$Validation_Tags <- ""
-  # [Modified]: Removed Weight_Factor initialization
+  rf_results$Weight_Factor <- 0.8 
   
   # A. TF Validation
   if ("TF" %in% mode) {
@@ -76,7 +71,7 @@ scVirtualKO <- function(seurat_obj,
     tf_targets <- .get_tf_targets(ko_gene)
     hits <- rf_results$Gene %in% tf_targets
     rf_results$Validation_Tags[hits] <- paste(rf_results$Validation_Tags[hits], "Motif", sep = "; ")
-    # [Modified]: Removed Weight calculation
+    rf_results$Weight_Factor[hits] <- rf_results$Weight_Factor[hits] + 1.2 
   }
   
   # B. Ligand Validation
@@ -85,6 +80,7 @@ scVirtualKO <- function(seurat_obj,
     nn_targets <- .get_nichenet_targets(ko_gene, type="Ligand", nichenet_mat, lr_net=NULL)
     hits <- rf_results$Gene %in% nn_targets
     rf_results$Validation_Tags[hits] <- paste(rf_results$Validation_Tags[hits], "Pathway(L)", sep = "; ")
+    rf_results$Weight_Factor[hits] <- rf_results$Weight_Factor[hits] + 0.8
   }
   
   # C. Receptor Validation
@@ -94,6 +90,7 @@ scVirtualKO <- function(seurat_obj,
     nn_targets <- .get_nichenet_targets(ko_gene, type="Receptor", nichenet_mat, lr_net)
     hits <- rf_results$Gene %in% nn_targets
     rf_results$Validation_Tags[hits] <- paste(rf_results$Validation_Tags[hits], "Pathway(R)", sep = "; ")
+    rf_results$Weight_Factor[hits] <- rf_results$Weight_Factor[hits] + 0.8
   }
   
   # D. PPI Validation
@@ -102,6 +99,7 @@ scVirtualKO <- function(seurat_obj,
     ppi_targets <- .get_ppi_targets(ko_gene, ppi_source)
     hits <- rf_results$Gene %in% ppi_targets
     rf_results$Validation_Tags[hits] <- paste(rf_results$Validation_Tags[hits], "PPI", sep = "; ")
+    rf_results$Weight_Factor[hits] <- rf_results$Weight_Factor[hits] + 0.7 
   }
   
   # --- Step 3: Formatting Output ---
@@ -109,7 +107,7 @@ scVirtualKO <- function(seurat_obj,
   rf_results$Validation <- trimws(rf_results$Validation)
   rf_results$Validation[rf_results$Validation == ""] <- "Predicted-Only"
   
-  # [Modified]: Removed Hybrid_Score calculation
+  rf_results$Hybrid_Score <- abs(rf_results$Z_Score) * rf_results$Weight_Factor
   
   if ("P_Value" %in% colnames(rf_results)) {
     rf_results$P_Adj <- p.adjust(rf_results$P_Value, method = "fdr")
@@ -121,18 +119,13 @@ scVirtualKO <- function(seurat_obj,
     rf_results$Source <- "Auto"
   }
   
-  # [Modified]: Removed "Hybrid_Score" from cols_order
-  cols_order <- c("Gene", "Source", "Delta_Mean", "Z_Score", "P_Value", "P_Adj", "KO_Importance", "Validation")
+  cols_order <- c("Gene", "Source", "Delta_Mean", "Z_Score", "P_Value", "P_Adj", "KO_Importance", "Validation", "Hybrid_Score")
   cols_to_select <- intersect(cols_order, colnames(rf_results))
   extra_cols <- setdiff(colnames(rf_results), cols_to_select)
-  
-  # [Modified]: Also define extra cols to exclude intermediate tags
-  extra_cols <- setdiff(extra_cols, c("Validation_Tags"))
+  extra_cols <- setdiff(extra_cols, c("Validation_Tags", "Weight_Factor"))
   
   final_results <- rf_results[, c(cols_to_select, extra_cols)]
-  
-  # [Modified]: Sorting by absolute Z_Score (Magnitude of change) instead of Hybrid_Score
-  final_results <- final_results[order(abs(final_results$Z_Score), decreasing = TRUE), ]
+  final_results <- final_results[order(final_results$Hybrid_Score, decreasing = TRUE), ]
   rownames(final_results) <- NULL
   
   return(final_results)
@@ -140,7 +133,7 @@ scVirtualKO <- function(seurat_obj,
 
 
 # ==============================================================================
-# 2. Helper Functions (Unchanged)
+# 2. Helper Functions
 # ==============================================================================
 .get_tf_targets <- function(ko_gene) {
   if (!requireNamespace("dorothea", quietly = TRUE)) return(character(0))
