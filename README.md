@@ -1,6 +1,6 @@
-scVirtualKO: In Silico Knockout Analysis for Single-Cell RNA-seq
+scDeepPerturb: In Silico Knockout Analysis for Single-Cell RNA-seq
 
-scVirtualKO is an R-based tool designed to perform in silico perturbation analysis on single-cell RNA-sequencing (scRNA-seq) data. By leveraging Random Forest regression at the single-cell level, it models the dependency between a target gene (KO gene) and downstream targets, allowing you to predict the shift in gene expression upon virtual knockout.
+scDeepPerturb is an R-based tool designed to perform in silico perturbation analysis on single-cell RNA-sequencing (scRNA-seq) data. By leveraging Random Forest regression at the single-cell level, it models the dependency between a target gene (KO gene) and downstream targets, allowing you to predict the shift in gene expression upon virtual knockout.
 
 Key Idea: Train on the population, predict on single cells, and validate with multi-modal prior knowledge (PPI, TF motifs, Ligand-Receptor networks).
 
